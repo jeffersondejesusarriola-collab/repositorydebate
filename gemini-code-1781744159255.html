@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Looping 3-Way Debate with Free Intervention</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        @keyframes pulse-fast {
+            0%, 100% { transform: scale(1); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
+            50% { transform: scale(1.02); box-shadow: 0 20px 25px -5px rgba(59, 130, 246, 0.3); }
+        }
+        .active-speaker {
+            animation: pulse-fast 1.5s infinite;
+            border-width: 4px !important;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="max-w-4xl w-full bg-white rounded-2xl shadow-xl border border-slate-200 p-8 text-center">
+        <h1 class="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-700 mb-2 tracking-wide">
+            🔥 3-WAY LOOPING DEBATE 🔥
+        </h1>
+        <p class="text-slate-500 mb-8 text-xs font-bold uppercase tracking-widest">5-Minute Showdown • 30-Second Rotations with Repeating Free Interventions</p>
+
+        <!-- Topic Display -->
+        <div class="bg-slate-100 rounded-xl p-6 border border-slate-200 mb-8 min-h-[100px] flex flex-col justify-center items-center shadow-inner">
+            <span class="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-2">Current Debate Topic:</span>
+            <div id="topic-display" class="text-xl md:text-2xl font-extrabold text-slate-800 italic">
+                Click "Start Looping Debate" to generate a topic and assign speakers...
+            </div>
+        </div>
+
+        <!-- Timers Layout -->
+        <div class="grid grid-cols-2 gap-4 mb-8">
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div class="text-xs text-slate-500 uppercase font-bold tracking-wider">Total Debate Time</div>
+                <div id="total-timer" class="text-3xl font-mono font-black text-slate-700">05:00</div>
+            </div>
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div class="text-xs text-slate-500 uppercase font-bold tracking-wider">Current Step Timer</div>
+                <div id="turn-timer" class="text-3xl font-mono font-black text-indigo-600">30s</div>
+            </div>
+        </div>
+
+        <!-- The 3 Debaters -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <!-- Speaker A -->
+            <div id="card-agree" class="bg-slate-50 p-5 rounded-xl border-2 border-slate-200 transition-all duration-300">
+                <div class="inline-block bg-emerald-100 text-emerald-800 text-xs px-2.5 py-1 rounded-full font-bold uppercase mb-3 border border-emerald-200">
+                    SPEAKER A: AGREE 👍
+                </div>
+                <div id="name-agree" class="text-2xl font-black text-slate-900 tracking-tight">—</div>
+            </div>
+
+            <!-- Speaker B -->
+            <div id="card-disagree" class="bg-slate-50 p-5 rounded-xl border-2 border-slate-200 transition-all duration-300">
+                <div class="inline-block bg-rose-100 text-rose-800 text-xs px-2.5 py-1 rounded-full font-bold uppercase mb-3 border border-rose-200">
+                    SPEAKER B: DISAGREE 👎
+                </div>
+                <div id="name-disagree" class="text-2xl font-black text-slate-900 tracking-tight">—</div>
+            </div>
+
+            <!-- Speaker C -->
+            <div id="card-wildcard" class="bg-slate-50 p-5 rounded-xl border-2 border-slate-200 transition-all duration-300">
+                <div class="inline-block bg-amber-100 text-amber-800 text-xs px-2.5 py-1 rounded-full font-bold uppercase mb-3 border border-amber-200">
+                    SPEAKER C: WILDCARD 🌀
+                </div>
+                <div id="name-wildcard" class="text-2xl font-black text-slate-900 tracking-tight">—</div>
+            </div>
+        </div>
+
+        <!-- Dynamic Live Alert Instruction -->
+        <div id="instruction-bar" class="text-lg font-bold text-slate-700 mb-8 min-h-[48px] bg-slate-100 rounded-lg py-3 px-4 border border-slate-200 flex items-center justify-center">
+            Ready to begin.
+        </div>
+
+        <!-- Control Button -->
+        <button id="btn-start" class="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-black text-lg py-4 px-6 rounded-xl shadow-md transition-all transform hover:scale-[1.01] active:scale-[0.99] cursor-pointer tracking-wider uppercase">
+            🚀 Start Looping Debate
+        </button>
+    </div>
+
+    <script>
+        const students = ["Alexandra", "Adriana", "Wendy", "Barney", "Brisa", "Maribell", "Andrea"];
+        
+        const topics = [
+            "Should Artificial Intelligence permanently replace human workers in creative industries like writing and art?",
+            "Should space exploration agencies prioritize funding colonization efforts on Mars over solving climate change on Earth?",
+            "Should social media platforms ban algorithmic feeds entirely to protect mental health?",
+            "Should physical cash be completely phased out in favor of a 100% digital, cashless economy?",
+            "Should standard working hours be permanently reduced to a 4-day workweek without reducing pay?",
+            "Should standard internal combustion engine vehicles be entirely banned from major city centers within the next 5 years?"
+        ];
+
+        let totalSeconds = 300; // 5 Minutes
+        let turnSeconds = 30;   // 30 seconds per step
+        let countdownInterval = null;
+        
+        // Loop control step tracking index: 0=A, 1=B, 2=C, 3=Free Intervention (then wraps back to 0)
+        let loopStep = 0; 
+
+        let currentAgreeStudent = '';
+        let currentDisagreeStudent = '';
+        let currentWildcardStudent = '';
+
+        function playBuzzer() {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.setValueAtTime(160, audioCtx.currentTime); 
+            gainNode.gain.setValueAtTime(0.25, audioCtx.currentTime);
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            oscillator.start();
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+            oscillator.stop(audioCtx.currentTime + 0.4);
+        }
+
+        function initializeDebate() {
+            const randomTopic = topics[Math.floor(Math.random() * topics.length)];
+            document.getElementById('topic-display').innerText = randomTopic;
+
+            let shuffled = [...students].sort(() => 0.5 - Math.random());
+            currentAgreeStudent = shuffled[0];
+            currentDisagreeStudent = shuffled[1];
+            currentWildcardStudent = shuffled[2];
+
+            document.getElementById('name-agree').innerText = currentAgreeStudent;
+            document.getElementById('name-disagree').innerText = currentDisagreeStudent;
+            document.getElementById('name-wildcard').innerText = currentWildcardStudent;
+
+            totalSeconds = 300; 
+            turnSeconds = 30;
+            loopStep = 0;
+            
+            updateVisualIndicators();
+        }
+
+        function updateVisualIndicators() {
+            const cardAgree = document.getElementById('card-agree');
+            const cardDisagree = document.getElementById('card-disagree');
+            const cardWildcard = document.getElementById('card-wildcard');
+            const instructionBar = document.getElementById('instruction-bar');
+
+            // Reset UI states smoothly
+            [cardAgree, cardDisagree, cardWildcard].forEach(card => {
+                card.classList.remove('active-speaker', 'border-emerald-500', 'border-rose-500', 'border-amber-500', 'border-blue-500', 'bg-emerald-50', 'bg-rose-50', 'bg-amber-50', 'bg-blue-50');
+                card.classList.add('border-slate-200');
+            });
+
+            // Handle the 4 distinct sequence steps dynamically
+            if (loopStep === 0) {
+                cardAgree.classList.add('active-speaker', 'border-emerald-500', 'bg-emerald-50');
+                cardAgree.classList.remove('border-slate-200');
+                instructionBar.innerHTML = `📢 Speaker A: <span class="text-emerald-700 font-extrabold mx-1">${currentAgreeStudent}</span> is presenting.`;
+            } 
+            else if (loopStep === 1) {
+                cardDisagree.classList.add('active-speaker', 'border-rose-500', 'bg-rose-50');
+                cardDisagree.classList.remove('border-slate-200');
+                instructionBar.innerHTML = `⚡ Speaker B: <span class="text-rose-700 font-extrabold mx-1">${currentDisagreeStudent}</span>, take the floor to counter.`;
+            } 
+            else if (loopStep === 2) {
+                cardWildcard.classList.add('active-speaker', 'border-amber-500', 'bg-amber-50');
+                cardWildcard.classList.remove('border-slate-200');
+                instructionBar.innerHTML = `🌀 Speaker C: <span class="text-amber-700 font-extrabold mx-1">${currentWildcardStudent}</span>, introduce your alternative viewpoint.`;
+            } 
+            else if (loopStep === 3) {
+                // Repeating Free Intervention Step
+                [cardAgree, cardDisagree, cardWildcard].forEach(card => {
+                    card.classList.add('active-speaker', 'border-blue-500', 'bg-blue-50');
+                    card.classList.remove('border-slate-200');
+                });
+                instructionBar.innerHTML = `🌐 <span class="text-blue-700 font-extrabold uppercase animate-pulse">FREE INTERVENTION STEP!</span> Open discussion floor for all three speakers.`;
+            }
+        }
+
+        function formatTime(sec) {
+            const mins = Math.floor(sec / 60).toString().padStart(2, '0');
+            const secs = (sec % 60).toString().padStart(2, '0');
+            return `${mins}:${secs}`;
+        }
+
+        function startTimer() {
+            if (countdownInterval) clearInterval(countdownInterval);
+
+            countdownInterval = setInterval(() => {
+                totalSeconds--;
+                turnSeconds--;
+
+                document.getElementById('total-timer').innerText = formatTime(totalSeconds);
+                document.getElementById('turn-timer').innerText = `${turnSeconds}s`;
+
+                // Handle the sequence progression
+                if (turnSeconds <= 0 && totalSeconds > 0) {
+                    playBuzzer();
+                    turnSeconds = 30;
+                    
+                    // Advance step or loop back to 0 if it hits 4
+                    loopStep = (loopStep + 1) % 4; 
+                    
+                    updateVisualIndicators();
+                }
+
+                if (totalSeconds <= 0) {
+                    clearInterval(countdownInterval);
+                    playBuzzer();
+                    setTimeout(playBuzzer, 400); 
+                    document.getElementById('instruction-bar').innerHTML = "🛑 DEBATE OVER! Spectacular arguments from all three presenters!";
+                    
+                    document.getElementById('btn-start').disabled = false;
+                    document.getElementById('btn-start').innerText = "🚀 Start Next Looping Debate";
+                }
+            }, 1000);
+        }
+
+        document.getElementById('btn-start').addEventListener('click', function() {
+            this.disabled = true;
+            this.innerText = "⏳ LIVE DEBATE RUNNING...";
+            initializeDebate();
+            startTimer();
+        });
+    </script>
+</body>
+</html>
